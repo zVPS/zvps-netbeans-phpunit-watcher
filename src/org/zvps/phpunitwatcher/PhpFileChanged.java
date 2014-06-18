@@ -17,10 +17,15 @@
  **/
 package org.zvps.phpunitwatcher;
 
+import java.util.List;
+import java.util.Set;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
+import org.netbeans.modules.php.api.phpmodule.PhpModule;
 import org.netbeans.modules.php.project.PhpProject;
 import org.netbeans.modules.php.project.ui.actions.RunTestCommand;
+import org.netbeans.modules.php.spi.testing.PhpTestingProvider;
+import org.netbeans.modules.php.spi.testing.locate.Locations;
 import org.openide.filesystems.FileObject;
 
 public class PhpFileChanged {
@@ -37,10 +42,18 @@ public class PhpFileChanged {
         
         Project currentProject = FileOwnerQuery.getOwner(changedFileObject);
         PhpProject currentPhpProject = (PhpProject) currentProject;
-        
+        PhpModule currentPhpModule = (PhpModule) currentPhpProject.getPhpModule();
         RunTestCommand currentTestCommand = new RunTestCommand(currentPhpProject);
-        currentTestCommand.invokeActionInternal(changedFileObject.getLookup());
         
+        List<PhpTestingProvider> currentTestingProviders = currentPhpProject.getTestingProviders();
+        
+        for (PhpTestingProvider currentPhpTestingProvider : currentTestingProviders) {
+            Set<Locations.Offset> tests = currentPhpTestingProvider.getTestLocator(currentPhpModule).findTests(changedFileObject);
+            
+            if(tests.isEmpty() == false) {
+                currentTestCommand.invokeActionInternal(changedFileObject.getLookup());
+            }
+        }
     }
-   
+
 }
