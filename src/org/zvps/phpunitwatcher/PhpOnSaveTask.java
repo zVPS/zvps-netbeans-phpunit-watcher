@@ -17,6 +17,8 @@
  **/
 package org.zvps.phpunitwatcher;
 
+import java.util.HashSet;
+import java.util.Set;
 import javax.swing.text.Document;
 import org.netbeans.api.editor.mimelookup.MimeRegistration;
 import org.netbeans.modules.editor.NbEditorUtilities;
@@ -28,7 +30,7 @@ public final class PhpOnSaveTask implements OnSaveTask.Factory {
     
     private Document currentDocument;
     private FileObject currentFile;
-    private PhpFileChangeListener currentFileListener;
+    private final Set<FileObject> registeredFileList = new HashSet<>();
 
     /**
      * constructor
@@ -47,7 +49,10 @@ public final class PhpOnSaveTask implements OnSaveTask.Factory {
         this.currentFile = NbEditorUtilities.getFileObject( currentDocument );
         
         /** Register a custom file change listener to the file */
-        this.registerFileChangeListener();
+        
+        if(this.currentFile != null) {
+            this.registerFileChangeListener();
+        }
         
         /** Compulsory registration of SaveTask to current file. */
         OnSaveTask onSaveTask = new PhpOnSaveTaskRun();
@@ -56,17 +61,15 @@ public final class PhpOnSaveTask implements OnSaveTask.Factory {
     
     private void registerFileChangeListener() {
         
-        if(this.currentFileListener == null) {
-            
+        if(!(this.registeredFileList.contains(this.currentFile))) {
+        
             /** Create a new PhpFileChangeListener to register to the File being saved */
-            this.currentFileListener = new PhpFileChangeListener();
-
-            /** remove listener if already added */
-            this.currentFile.removeFileChangeListener( this.currentFileListener );
+            PhpFileChangeListener currentFileListener = new PhpFileChangeListener();
 
             /** Register our new PhpFileChangeListener to run custom code on file change */
-            this.currentFile.addFileChangeListener( this.currentFileListener );
-            
+            this.currentFile.addFileChangeListener( currentFileListener );
+
+            this.registeredFileList.add(currentFile);
         }
 
     }
