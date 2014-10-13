@@ -1,6 +1,6 @@
-Manifest-Version: 1.2
+Manifest-Version: 1.3
 AutoUpdate-Show-In-Client: true
 OpenIDE-Module: org.zvps.phpunitwatcher
-OpenIDE-Module-Specification-Version: 1.2
+OpenIDE-Module-Specification-Version: 1.3
 OpenIDE-Module-Localizing-Bundle: org/zvps/phpunitwatcher/Bundle.properties
 
