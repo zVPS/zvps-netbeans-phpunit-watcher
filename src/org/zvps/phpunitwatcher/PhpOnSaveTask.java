@@ -17,59 +17,102 @@
  **/
 package org.zvps.phpunitwatcher;
 
-import java.util.HashSet;
-import java.util.Set;
-import javax.swing.text.Document;
+import java.awt.EventQueue;
+import java.util.Arrays;
 import org.netbeans.api.editor.mimelookup.MimeRegistration;
+import org.netbeans.api.project.FileOwnerQuery;
+import org.netbeans.api.project.Project;
+import org.netbeans.api.project.ProjectUtils;
+import org.netbeans.api.project.SourceGroup;
 import org.netbeans.modules.editor.NbEditorUtilities;
 import org.netbeans.spi.editor.document.OnSaveTask;
+import org.netbeans.spi.project.ActionProvider;
 import org.openide.filesystems.FileObject;
+import org.openide.filesystems.FileUtil;
+import org.openide.util.Lookup;
+import org.openide.util.RequestProcessor;
+import org.openide.util.lookup.Lookups;
 
-@MimeRegistration(mimeType = "text/x-php5", service = OnSaveTask.Factory.class, position = 2000)
-public final class PhpOnSaveTask implements OnSaveTask.Factory {
-    
-    private Document currentDocument;
-    private FileObject currentFile;
-    private final Set<FileObject> registeredFileList = new HashSet<>();
+public final class PhpOnSaveTask implements OnSaveTask, Runnable {
 
-    /**
-     * constructor
-     */
-    public PhpOnSaveTask() {
+    private static final RequestProcessor RP = new RequestProcessor(PhpOnSaveTask.class);
+
+    private final FileObject fileObject;
+
+
+    PhpOnSaveTask(FileObject fileObject) {
+        assert fileObject != null;
+        this.fileObject = fileObject;
     }
 
-    /** run on save tasks */
     @Override
-    public OnSaveTask createTask(OnSaveTask.Context context) {
-        
-        /** Get the current document being saved from current context */
-        this.currentDocument = context.getDocument();
-        
-        /** Get current file being saved */
-        this.currentFile = NbEditorUtilities.getFileObject( currentDocument );
-        
-        /** Register a custom file change listener to the file */
-        
-        if(this.currentFile != null) {
-            this.registerFileChangeListener();
-        }
-        
-        /** Compulsory registration of SaveTask to current file. */
-        OnSaveTask onSaveTask = new PhpOnSaveTaskRun();
-        return onSaveTask;
+    public void performTask() {
+        // noop
     }
-    
-    private void registerFileChangeListener() {
-        
-        if(!(this.registeredFileList.contains(this.currentFile))) {
-        
-            /** Create a new PhpFileChangeListener to register to the File being saved */
-            PhpFileChangeListener currentFileListener = new PhpFileChangeListener();
 
-            /** Register our new PhpFileChangeListener to run custom code on file change */
-            this.currentFile.addFileChangeListener( currentFileListener );
+    @Override
+    public void runLocked(Runnable run) {
+        RP.post(this);
+    }
 
-            this.registeredFileList.add(currentFile);
+    @Override
+    public boolean cancel() {
+        // noop
+        return false;
+    }
+
+    @Override
+    public void run() {
+        Project project = FileOwnerQuery.getOwner(fileObject);
+        if (project == null) {
+            return;
+        }
+        SourceGroup[] sourceGroups = ProjectUtils.getSources(project).getSourceGroups("PHPSOURCE"); // NOI18N
+        if (sourceGroups.length < 1) {
+            return;
+        }
+        if (!isSourceFile(fileObject, sourceGroups)) {
+            return;
+        }
+        final ActionProvider actionProvider = project.getLookup().lookup(ActionProvider.class);
+        if (actionProvider == null) {
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                Lookup lookup = Lookups.fixed(fileObject);
+                if (Arrays.asList(actionProvider.getSupportedActions()).contains(ActionProvider.COMMAND_TEST_SINGLE)
+                        && actionProvider.isActionEnabled(ActionProvider.COMMAND_TEST_SINGLE, lookup)) {
+                    actionProvider.invokeAction(ActionProvider.COMMAND_TEST_SINGLE, lookup);
+                }
+            }
+        });
+    }
+
+    // a it hack to avoid impl dep on php.api.phpmodule
+    private static boolean isSourceFile(FileObject fileObject, SourceGroup[] sourceGroups) {
+        if (!FileUtil.isParentOf(sourceGroups[0].getRootFolder(), fileObject)) {
+            // not a source file
+            return false;
+        }
+        for (int i = 1; i < sourceGroups.length; ++i) {
+            if (FileUtil.isParentOf(sourceGroups[i].getRootFolder(), fileObject)) {
+                // some test file
+                return false;
+            }
+        }
+        return true;
+    }
+
+    //~ Factories
+
+    @MimeRegistration(mimeType = "text/x-php5", service = OnSaveTask.Factory.class, position = 2000)
+    public static final class Factory implements OnSaveTask.Factory {
+
+        @Override
+        public OnSaveTask createTask(OnSaveTask.Context context) {
+            return new PhpOnSaveTask(NbEditorUtilities.getFileObject(context.getDocument()));
         }
 
     }
