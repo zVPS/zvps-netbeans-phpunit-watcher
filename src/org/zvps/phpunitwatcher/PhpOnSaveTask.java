@@ -1,6 +1,6 @@
 /**
  *   PHPUnit Watcher - run unit tests on save
- *   Copyright (C) 2014  nForced Website Hosting Limited
+ *   Copyright (C) 2016  nForced Website Hosting Limited
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -14,6 +14,12 @@
  *
  *   You should have received a copy of the GNU General Public License
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ *   Contributions List (please see github.com/zVPS/zvps-netbeans-phpunit-watcher)
+ *   for an up-to-date list
+ *   https://github.com/tmysik
+ *   https://github.com/Caffe1neAdd1ct
+ * 
  **/
 package org.zvps.phpunitwatcher;
 
