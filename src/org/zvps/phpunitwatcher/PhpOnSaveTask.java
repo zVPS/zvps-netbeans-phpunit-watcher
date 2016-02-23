@@ -23,95 +23,72 @@
  **/
 package org.zvps.phpunitwatcher;
 
-import java.util.Arrays;
 import javax.swing.text.Document;
 import org.netbeans.api.editor.mimelookup.MimeRegistration;
 import org.netbeans.spi.editor.document.OnSaveTask;
 import org.openide.filesystems.FileObject;
-import org.netbeans.api.project.FileOwnerQuery;
-import org.netbeans.api.project.Project;
-import org.netbeans.api.project.ProjectUtils;
-import org.netbeans.api.project.SourceGroup;
+import org.netbeans.api.progress.ProgressHandle;
 import org.netbeans.modules.parsing.api.Source;
-import org.netbeans.spi.project.ActionProvider;
-import org.openide.filesystems.FileUtil;
-import org.openide.util.Lookup;
 import org.openide.util.RequestProcessor;
-import org.openide.util.lookup.Lookups;
+import org.openide.util.TaskListener;
 
-//~ Factories
-@MimeRegistration(mimeType = "text/x-php5", service = OnSaveTask.Factory.class, position = 2000)
-public final class PhpOnSaveTask implements OnSaveTask.Factory, Runnable {
-
+public final class PhpOnSaveTask implements OnSaveTask {
+    
     private final static RequestProcessor RP = new RequestProcessor("phpunitwatchertasks", 1, true);
-    private final RequestProcessor.Task task = RP.create(this);
-    private final static int DELAY = 1000;
-
-    private FileObject fileObject;
-
-    PhpOnSaveTask() {
+    
+    private final FileObject fileObject;
+    
+    PhpOnSaveTask(FileObject fileObject) {
+        assert fileObject != null;
+        this.fileObject = fileObject;
     }
 
     @Override
-    public void run() {
-        Project project = FileOwnerQuery.getOwner(fileObject);
-        if (project == null) {
-            return;
-        }
-        SourceGroup[] sourceGroups = ProjectUtils.getSources(project).getSourceGroups("PHPSOURCE"); // NOI18N
-        if (sourceGroups.length < 1) {
-            return;
-        }
-        if (!isSourceFile(fileObject, sourceGroups)) {
-            return;
-        }
-        final ActionProvider actionProvider = project.getLookup().lookup(ActionProvider.class);
-        if (actionProvider == null) {
-            return;
-        }
-
-        Lookup lookup = Lookups.fixed(fileObject);
-        if (Arrays.asList(actionProvider.getSupportedActions()).contains(ActionProvider.COMMAND_TEST_SINGLE)
-                && actionProvider.isActionEnabled(ActionProvider.COMMAND_TEST_SINGLE, lookup)) {
-            actionProvider.invokeAction(ActionProvider.COMMAND_TEST_SINGLE, lookup);
-        }
+    public void performTask() {
+        
+        PhpUnitTestRunnable UnitTestRunnable = new PhpUnitTestRunnable(fileObject);
+        
+        final RequestProcessor.Task theTask = RP.create(UnitTestRunnable);
+        
+        final ProgressHandle ph = ProgressHandle.createHandle("performing test", theTask);
+        theTask.addTaskListener(new TaskListener() {
+            @Override
+            public void taskFinished(org.openide.util.Task task) {
+                ph.finish();
+            }
+        });
+        
+        theTask.schedule(1000);
     }
 
-    /**
-     * Avoiding impl dep on php.api.phpmodule
-     * @param fileObject
-     * @param sourceGroups
-     * @return 
-     */
-    private static boolean isSourceFile(FileObject fileObject, SourceGroup[] sourceGroups) {
-        if (!FileUtil.isParentOf(sourceGroups[0].getRootFolder(), fileObject)) {
-            // not a source file
-            return false;
-        }
-        for (int i = 1; i < sourceGroups.length; ++i) {
-            if (FileUtil.isParentOf(sourceGroups[i].getRootFolder(), fileObject)) {
-                // some test file
-                return false;
-            }
-        }
+    @Override
+    public void runLocked(Runnable run) {
+        run.run();
+    }
+
+    @Override
+    public boolean cancel() {
+        // noop
         return true;
     }
+    
+    //~ Factories
+    @MimeRegistration(mimeType = "text/x-php5", service = OnSaveTask.Factory.class, position = 2000)
+    public static final class Factory implements OnSaveTask.Factory {
 
-    @Override
-    public OnSaveTask createTask(OnSaveTask.Context context) {
+        @Override
+        public OnSaveTask createTask(OnSaveTask.Context context) {
+            
+            Document document = context.getDocument(); 
+            if (document == null) { 
+                return null; 
+            } 
+ 
+            Source source = Source.create(document); 
+            FileObject srcFile = source.getFileObject(); 
+            return srcFile != null ? new PhpOnSaveTask(srcFile) : null; 
+        }
 
-        Document document = context.getDocument(); 
-        if (document == null) { 
-            return null; 
-        } 
-
-        Source source = Source.create(document); 
-        this.fileObject = source.getFileObject(); 
-
-        task.setPriority(Thread.MIN_PRIORITY);
-        task.schedule(DELAY);
-
-        return new PhpOnSaveTaskRun();
     }
 
 }
