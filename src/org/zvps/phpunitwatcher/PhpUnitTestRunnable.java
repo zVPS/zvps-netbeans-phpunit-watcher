@@ -5,7 +5,6 @@
  */
 package org.zvps.phpunitwatcher;
 
-import java.awt.EventQueue;
 import java.util.Arrays;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
@@ -15,7 +14,6 @@ import org.netbeans.spi.project.ActionProvider;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.util.Lookup;
-import org.openide.util.RequestProcessor;
 import org.openide.util.lookup.Lookups;
 
 /**
@@ -30,6 +28,7 @@ public class PhpUnitTestRunnable implements Runnable {
         this.fileObject = fileObject;
     }
     
+    @Override
     public void run() {
         Project project = FileOwnerQuery.getOwner(fileObject);
         if (project == null) {
@@ -46,19 +45,20 @@ public class PhpUnitTestRunnable implements Runnable {
         if (actionProvider == null) {
             return;
         }
-        EventQueue.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                Lookup lookup = Lookups.fixed(fileObject);
-                if (Arrays.asList(actionProvider.getSupportedActions()).contains(ActionProvider.COMMAND_TEST_SINGLE)
-                        && actionProvider.isActionEnabled(ActionProvider.COMMAND_TEST_SINGLE, lookup)) {
-                    actionProvider.invokeAction(ActionProvider.COMMAND_TEST_SINGLE, lookup);
-                }
-            }
-        });
+
+        Lookup lookup = Lookups.fixed(fileObject);
+        if (Arrays.asList(actionProvider.getSupportedActions()).contains(ActionProvider.COMMAND_TEST_SINGLE)
+                && actionProvider.isActionEnabled(ActionProvider.COMMAND_TEST_SINGLE, lookup)) {
+            actionProvider.invokeAction(ActionProvider.COMMAND_TEST_SINGLE, lookup);
+        }
     }
 
-    // a it hack to avoid impl dep on php.api.phpmodule
+    /**
+     * Avoiding impl dep on php.api.phpmodule
+     * @param fileObject
+     * @param sourceGroups
+     * @return 
+     */
     private static boolean isSourceFile(FileObject fileObject, SourceGroup[] sourceGroups) {
         if (!FileUtil.isParentOf(sourceGroups[0].getRootFolder(), fileObject)) {
             // not a source file

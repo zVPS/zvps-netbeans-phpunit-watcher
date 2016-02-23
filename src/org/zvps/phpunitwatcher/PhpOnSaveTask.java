@@ -23,14 +23,12 @@
  **/
 package org.zvps.phpunitwatcher;
 
+import javax.swing.text.Document;
 import org.netbeans.api.editor.mimelookup.MimeRegistration;
-import org.netbeans.modules.editor.NbEditorUtilities;
 import org.netbeans.spi.editor.document.OnSaveTask;
 import org.openide.filesystems.FileObject;
 import org.netbeans.api.progress.ProgressHandle;
-import org.netbeans.api.progress.ProgressHandleFactory;
-import org.netbeans.api.project.FileOwnerQuery;
-import org.netbeans.api.project.Project;
+import org.netbeans.modules.parsing.api.Source;
 import org.openide.util.RequestProcessor;
 import org.openide.util.TaskListener;
 
@@ -38,7 +36,7 @@ public final class PhpOnSaveTask implements OnSaveTask {
     
     private final static RequestProcessor RP = new RequestProcessor("phpunitwatchertasks", 1, true);
     
-    private FileObject fileObject;
+    private final FileObject fileObject;
     
     PhpOnSaveTask(FileObject fileObject) {
         assert fileObject != null;
@@ -47,26 +45,25 @@ public final class PhpOnSaveTask implements OnSaveTask {
 
     @Override
     public void performTask() {
-    }
-
-    @Override
-    public void runLocked(Runnable run) {
         
         PhpUnitTestRunnable UnitTestRunnable = new PhpUnitTestRunnable(fileObject);
         
         final RequestProcessor.Task theTask = RP.create(UnitTestRunnable);
         
-        final ProgressHandle ph = ProgressHandle.createHandle("performing some task", theTask);
+        final ProgressHandle ph = ProgressHandle.createHandle("performing test", theTask);
         theTask.addTaskListener(new TaskListener() {
             @Override
             public void taskFinished(org.openide.util.Task task) {
-                //make sure that we get rid of the ProgressHandle
-                //when the task is finished
                 ph.finish();
             }
         });
         
         theTask.schedule(1000);
+    }
+
+    @Override
+    public void runLocked(Runnable run) {
+        run.run();
     }
 
     @Override
@@ -81,7 +78,15 @@ public final class PhpOnSaveTask implements OnSaveTask {
 
         @Override
         public OnSaveTask createTask(OnSaveTask.Context context) {
-            return new PhpOnSaveTask(NbEditorUtilities.getFileObject(context.getDocument()));
+            
+            Document document = context.getDocument(); 
+            if (document == null) { 
+                return null; 
+            } 
+ 
+            Source source = Source.create(document); 
+            FileObject srcFile = source.getFileObject(); 
+            return srcFile != null ? new PhpOnSaveTask(srcFile) : null; 
         }
 
     }
